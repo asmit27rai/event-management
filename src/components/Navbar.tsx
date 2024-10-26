@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Calendar, PlusCircle, Bell, User, LogOut, Inbox } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // Updated event types to match database enum values exactly
 const eventTypes = [
@@ -57,6 +58,7 @@ interface EventData {
 }
 
 export function Navbar() {
+  const { toast } = useToast();
   const [user, setUser] = useState<UserData | null>(null);
   const navigate = useNavigate();
   const admin = import.meta.env.VITE_ADMIN_EMAIL;
@@ -91,6 +93,10 @@ export function Navbar() {
   const handleLogout = async () => {
     try {
       await account.deleteSession("current");
+      toast({
+        title: "Logout successful",
+        description: "You have logged out successfully.",
+      });
       navigate("/login");
     } catch (error) {
       console.error("Logout failed:", error);

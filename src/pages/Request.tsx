@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useNavigate } from "react-router-dom";
+import { useToast } from '@/hooks/use-toast';
 
 interface EventDocument {
   $id: string;
@@ -59,6 +60,7 @@ interface UserData {
 }
 
 const Request = () => {
+  const { toast } = useToast();
   const [user, setUser] = useState<UserData | null>(null);
   const [requests, setRequests] = useState<RequestDocument[]>([]);
   const [filterStatus, setFilterStatus] = useState('all');
@@ -261,6 +263,10 @@ const Request = () => {
 
       await fetchRequests();
       setIsAlertOpen(false);
+      toast({
+        title: 'Request Updated',
+        description: 'The request status has been successfully updated.',
+      })
       setSelectedRequest(null);
       
     } catch (error) {

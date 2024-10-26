@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface RegistrationModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ export default function RegistrationModal({
   onClose,
   event,
 }: RegistrationModalProps) {
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
@@ -44,7 +46,10 @@ export default function RegistrationModal({
           status: "pending", // Required enum field
         }
       );
-
+      toast({
+        title: "Registration Request Sent",
+        description: "Wait For Administator Approval",
+      })
       onClose();
     } catch (error) {
       console.error("Registration error:", error);

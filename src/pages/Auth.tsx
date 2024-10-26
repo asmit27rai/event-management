@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Label } from "@/components/ui/label";
+import { useToast } from '@/hooks/use-toast';
 
 const deleteExistingSession = async () => {
   try {
@@ -23,6 +24,7 @@ const deleteExistingSession = async () => {
 };
 
 export function Login() {
+  const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -43,6 +45,10 @@ export function Login() {
     try {
       await deleteExistingSession();
       await account.createEmailPasswordSession(email, password);
+      toast({
+        title: 'Login successful',
+        description: 'You have logged in successfully.',
+      });
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to login');
@@ -103,6 +109,7 @@ export function Login() {
 }
 
 export function Signup() {
+  const { toast } = useToast();
   const [formData, setFormData] = useState({ email: '', password: '', name: '' });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -124,6 +131,10 @@ export function Signup() {
       const userId = ID.unique();
       await account.create(userId, formData.email, formData.password, formData.name);
       await account.createEmailPasswordSession(formData.email, formData.password);
+      toast({
+        title: 'Account created',
+        description: 'Your account has been created successfully',
+      });
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create account');
