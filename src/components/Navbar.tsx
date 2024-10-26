@@ -22,13 +22,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Calendar, PlusCircle, Bell, User, LogOut, Inbox } from "lucide-react";
 
-// Define the possible event types
+// Updated event types to match database enum values exactly
 const eventTypes = [
-  { label: "Technology", value: "technology" },
-  { label: "Business", value: "business" },
-  { label: "Entertainment", value: "entertainment" },
-  { label: "Sports", value: "sports" },
-  { label: "Education", value: "education" },
+  { label: "Technology", value: "Technology" },
+  { label: "Business", value: "Business" },
+  { label: "Entertainment", value: "Entertainment" },
+  { label: "Sports", value: "Sports" },
+  { label: "Education", value: "Education" },
 ];
 
 interface FormData {
@@ -37,13 +37,23 @@ interface FormData {
   location: string;
   description: string;
   attendeesCount: string;
-  type: string; // Added type
+  type: string;
 }
 
 interface UserData {
   email?: string;
   name?: string;
   $id?: string;
+}
+
+interface EventData {
+  title: string;
+  date: string;
+  location: string;
+  description: string;
+  type: string;
+  Max_Attendees: number;
+  Attendee: string[];
 }
 
 export function Navbar() {
@@ -59,7 +69,7 @@ export function Navbar() {
     location: "",
     description: "",
     attendeesCount: "",
-    type: "", // Initialize the new field
+    type: "",
   };
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -111,7 +121,7 @@ export function Navbar() {
       "location",
       "description",
       "attendeesCount",
-      "type", // Include type in validation
+      "type",
     ];
     for (const field of requiredFields) {
       if (!formData[field as keyof FormData]) {
@@ -127,13 +137,14 @@ export function Navbar() {
     setIsLoading(true);
 
     try {
-      const eventData = {
+      const eventData: EventData = {
         title: formData.title,
         date: new Date(formData.date).toISOString(),
         location: formData.location,
         description: formData.description,
-        attendeesCount: parseInt(formData.attendeesCount),
-        type: formData.type, // Add type to the event data
+        type: formData.type,
+        Max_Attendees: parseInt(formData.attendeesCount),
+        Attendee: [],
       };
 
       await databases.createDocument(
@@ -165,7 +176,7 @@ export function Navbar() {
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center">
               <Calendar className="h-8 w-8 text-blue-600" />
-              <span className="ml-2 text-xl font-bold">EventMaster</span>
+              <a href="/"><span className="ml-2 text-xl font-bold">EventMaster</span></a>
             </div>
             <div className="flex items-center space-x-4">
               {admin === user?.email && (
@@ -188,9 +199,7 @@ export function Navbar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>New event registration</DropdownMenuItem>
                   <DropdownMenuItem>Upcoming event reminder</DropdownMenuItem>
-                  <DropdownMenuItem>
-                    Event update: Venue changed
-                  </DropdownMenuItem>
+                  <DropdownMenuItem>Event update: Venue changed</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
               <DropdownMenu>
@@ -299,11 +308,11 @@ export function Navbar() {
               <Label htmlFor="type">Event Type</Label>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="w-full justify-between">
                     {formData.type || "Select Event Type"}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent>
+                <DropdownMenuContent className="w-full">
                   {eventTypes.map((event) => (
                     <DropdownMenuItem
                       key={event.value}

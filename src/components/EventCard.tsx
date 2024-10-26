@@ -13,12 +13,12 @@ interface EventCardProps {
     time: string;
     venue: string;
     category: string;
-    attendees: number;
+    Attendee: string[];  // Changed from attendees number to array of attendee IDs
     image: string;
+    Max_Attendees: number;
   };
   type: 'upcoming' | 'live' | 'past';
 }
-
 
 export function EventCard({ event, type }: EventCardProps) {
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
@@ -99,7 +99,7 @@ export function EventCard({ event, type }: EventCardProps) {
             <div className="flex items-center gap-2 text-gray-600">
               <Users className="w-4 h-4 flex-shrink-0" />
               <span className="text-sm">
-                {type === 'past' ? `${event.attendees} attended` : `${event.attendees} attendees`}
+                {type === 'past' ? `${event.Attendee.length} Attended` : `${event.Attendee.length} Attendees`}
               </span>
             </div>
 

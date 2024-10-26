@@ -14,37 +14,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Interface for the EventCard props
-interface EventCardProps {
-  id: number;
-  title: string;
-  date: string;
-  time: string;
-  venue: string;
-  category: string;
-  attendees: number;
-  image: string;
-}
-
-declare namespace AppwriteModels {
-  interface Document {
-    $id: string;
-    $createdAt: string;
-    $updatedAt: string;
-    $permissions: string[];
-    $collectionId: string;
-    $databaseId: string;
-  }
-}
-
 // Interface matching your Appwrite document structure
-interface EventDocument extends AppwriteModels.Document {
+interface EventDocument {
+  $id: string;
+  $createdAt: string;
+  $updatedAt: string;
+  $permissions: string[];
+  $collectionId: string;
+  $databaseId: string;
   title: string;
   date: string;
   location: string;
   description: string;
-  attendeesCount: number;
   type: string;
+  Max_Attendees: number;
+  Attendee: string[];
 }
 
 export function HomePage() {
@@ -65,17 +49,7 @@ export function HomePage() {
           import.meta.env.VITE_EVENT_COLLECTION_ID
         );
 
-        const eventsData = response.documents.map((doc) => ({
-          ...doc,
-          title: doc.title,
-          date: doc.date,
-          location: doc.location,
-          description: doc.description,
-          attendeesCount: doc.attendeesCount,
-          type: doc.type,
-        })) as EventDocument[];
-
-        setEvents(eventsData);
+        setEvents(response.documents as EventDocument[]);
       } catch (err) {
         console.error("Error fetching events:", err);
         setError("Failed to load events. Please try again later.");
@@ -96,18 +70,18 @@ export function HomePage() {
     };
   };
 
-  // Convert Appwrite document to EventCard props
-  const mapEventToCardProps = (event: EventDocument): EventCardProps => {
+  // Map event document to EventCard props
+  const mapEventToCardProps = (event: EventDocument) => {
     const { date, time } = formatEventDate(event.date);
     return {
-      // Here we map $id to the id field, if needed, else just use $id directly.
-      id: parseInt(event.$id), // This line is only if you want to use id as a number
+      $id: event.$id,
       title: event.title,
       date,
       time,
       venue: event.location,
-      category: typeof event.type === "string" ? event.type : "General",
-      attendees: event.attendeesCount,
+      category: event.type,
+      Attendee: event.Attendee,
+      Max_Attendees: event.Max_Attendees,
       image: "/api/placeholder/400/200",
     };
   };
@@ -165,17 +139,8 @@ export function HomePage() {
 
     return eventList.map((event) => (
       <EventCard
-        key={event.$id} // Ensure you're using $id as the key
-        event={{
-          $id: event.$id, // Ensure to include $id in the event object
-          title: mapEventToCardProps(event).title,
-          date: mapEventToCardProps(event).date,
-          time: mapEventToCardProps(event).time,
-          venue: mapEventToCardProps(event).venue,
-          category: mapEventToCardProps(event).category,
-          attendees: mapEventToCardProps(event).attendees,
-          image: mapEventToCardProps(event).image,
-        }}
+        key={event.$id}
+        event={mapEventToCardProps(event)}
         type={type}
       />
     ));

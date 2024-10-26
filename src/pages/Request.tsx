@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, Calendar, Loader2 } from "lucide-react";
+import { Clock, Calendar, Users, Loader2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +29,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface EventDocument {
+  $id: string;
+  title: string;
+  date: string;
+  Attendee: string[];
+  Max_Attendees: number;
+}
+
 type RequestDocument = {
     $id: string;
     $collectionId: string;
@@ -36,15 +44,10 @@ type RequestDocument = {
     $createdAt: string;
     $updatedAt: string;
     $permissions: string[];
-    eventDetails: EventDetails;
-    event: string;  // Changed to just string since we're handling a single event
+    event: string;
+    eventDetails: EventDocument;
     registrationDate: string;
-    status: string;
-};
-
-type EventDetails = {
-    title: string;
-    date: string;
+    status: 'pending' | 'approved' | 'rejected';
 };
 
 const Request = () => {
@@ -70,53 +73,95 @@ const Request = () => {
       const requestsWithEvents = await Promise.all(
         response.documents.map(async (request) => {
           try {
-            const eventId = typeof request.event === 'string' 
-              ? request.event 
-              : Array.isArray(request.event) 
-                ? request.event[0] 
-                : null;
-
-            if (!eventId) {
-              throw new Error('Invalid event ID');
+            // Debug log to see the actual structure of request.event
+            console.log('Request event data:', {
+              requestId: request.$id,
+              eventData: request.event,
+              eventType: typeof request.event
+            });
+  
+            let eventId: string;
+            
+            if (request.event === null || request.event === undefined) {
+              throw new Error('Event ID is missing');
             }
-
+  
+            // If event is already a string, use it directly
+            if (typeof request.event === 'string') {
+              eventId = request.event;
+            }
+            // If event is an object with $id
+            else if (typeof request.event === 'object' && '$id' in request.event) {
+              eventId = request.event.$id;
+            }
+            // If event is an object with id
+            else if (typeof request.event === 'object' && 'id' in request.event) {
+              eventId = request.event.id;
+            }
+            // If event is an array
+            else if (Array.isArray(request.event) && request.event.length > 0) {
+              const firstEvent = request.event[0];
+              if (typeof firstEvent === 'string') {
+                eventId = firstEvent;
+              } else if (typeof firstEvent === 'object' && firstEvent !== null) {
+                eventId = firstEvent.$id || firstEvent.id;
+              } else {
+                throw new Error('Invalid event array format');
+              }
+            }
+            // If event is an object, try to get the first key or value that looks like an ID
+            else if (typeof request.event === 'object') {
+              const eventObj = request.event as Record<string, any>;
+              const possibleId = Object.values(eventObj).find(value => 
+                typeof value === 'string' && value.length <= 36
+              );
+              if (possibleId) {
+                eventId = possibleId;
+              } else {
+                throw new Error('Could not find valid event ID in object');
+              }
+            } else {
+              throw new Error('Unsupported event data format');
+            }
+  
+            // Fetch the event details
             const eventResponse = await databases.getDocument(
               import.meta.env.VITE_DATABASE_ID,
               import.meta.env.VITE_EVENT_COLLECTION_ID,
               eventId
             );
-
+  
             const requestDoc: RequestDocument = {
-              $id: request.$id,
-              $collectionId: request.$collectionId,
-              $databaseId: request.$databaseId,
-              $createdAt: request.$createdAt,
-              $updatedAt: request.$updatedAt,
-              $permissions: request.$permissions,
+              ...request,
+              event: eventId,
               eventDetails: {
+                $id: eventResponse.$id,
                 title: eventResponse.title,
                 date: eventResponse.date,
+                Attendee: eventResponse.Attendee || [],
+                Max_Attendees: eventResponse.Max_Attendees
               },
-              event: eventId,
               registrationDate: request.registrationDate,
               status: request.status,
             };
-
+  
             return requestDoc;
           } catch (error) {
             console.error(`Error fetching event details for request ${request.$id}:`, error);
-            return {
-              ...request,
-              eventDetails: {
-                title: 'Event Not Found',
-                date: 'Unknown Date',
-              },
-            } as RequestDocument;
+            // Log additional debug information
+            console.debug('Failed request data:', {
+              request: request,
+              eventData: request.event,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            });
+            return null;
           }
         })
       );
       
-      setRequests(requestsWithEvents);
+      const validRequests = requestsWithEvents.filter((req): req is RequestDocument => req !== null);
+      console.log(`Successfully processed ${validRequests.length} out of ${response.documents.length} requests`);
+      setRequests(validRequests);
       setError(null);
     } catch (error) {
       console.error('Error fetching requests:', error);
@@ -130,35 +175,41 @@ const Request = () => {
     fetchRequests();
   }, []);
 
-  const handleStatusUpdate = async (requestId: string, newStatus: string) => {
+  const handleStatusUpdate = async (request: RequestDocument, newStatus: string) => {
     try {
       setIsLoading(true);
       
+      // Update request status
       await databases.updateDocument(
         import.meta.env.VITE_DATABASE_ID,
         import.meta.env.VITE_REQUESTS_COLLECTION_ID,
-        requestId,
+        request.$id,
         {
           status: newStatus
         }
       );
 
+      // If approving, update event's Attendee array
       if (newStatus === 'approved') {
-        const request = requests.find(r => r.$id === requestId);
-        if (request) {
-          const attendeeId = crypto.randomUUID().replace(/-/g, '');
-          
-          await databases.createDocument(
-            import.meta.env.VITE_DATABASE_ID,
-            import.meta.env.VITE_ATTENDEES_COLLECTION_ID,
-            attendeeId,
-            {
-              event: request.event,
-              registrationDate: request.registrationDate,
-              status: 'attending'
-            }
-          );
+        const currentEvent = request.eventDetails;
+        
+        // Check if event has reached maximum capacity
+        if (currentEvent.Attendee.length >= currentEvent.Max_Attendees) {
+          throw new Error('Event has reached maximum capacity');
         }
+
+        // Generate unique attendee ID (you might want to use actual user IDs in production)
+        const attendeeId = crypto.randomUUID();
+        
+        // Update event with new attendee
+        await databases.updateDocument(
+          import.meta.env.VITE_DATABASE_ID,
+          import.meta.env.VITE_EVENT_COLLECTION_ID,
+          currentEvent.$id,
+          {
+            Attendee: [...currentEvent.Attendee, attendeeId]
+          }
+        );
       }
 
       await fetchRequests();
@@ -167,7 +218,7 @@ const Request = () => {
       
     } catch (error) {
       console.error('Error updating status:', error);
-      setError('Failed to update request status. Please try again.');
+      setError(error instanceof Error ? error.message : 'Failed to update request status. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -242,9 +293,14 @@ const Request = () => {
                   <CardTitle className="text-xl">
                     {request.eventDetails.title}
                   </CardTitle>
-                  <Badge className={getStatusBadgeColor(request.status)}>
-                    {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                  </Badge>
+                  <div className="flex justify-between items-center">
+                    <Badge className={getStatusBadgeColor(request.status)}>
+                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                    </Badge>
+                    <div className="flex items-center gap-1 text-sm text-gray-600">
+                      <Users className="w-4 h-4" />
+                    </div>
+                  </div>
                 </CardHeader>
                 
                 <CardContent>
@@ -264,6 +320,7 @@ const Request = () => {
                         <Button 
                           onClick={() => openActionDialog(request, 'approve')}
                           className="bg-green-600 hover:bg-green-700 flex-1"
+                          disabled={request.eventDetails.Attendee.length >= request.eventDetails.Max_Attendees}
                         >
                           Approve
                         </Button>
@@ -290,7 +347,9 @@ const Request = () => {
               {actionType === 'approve' ? 'Approve Request' : 'Reject Request'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to {actionType} this request?
+              {actionType === 'approve' 
+                ? `Are you sure you want to approve this request? This will add the attendee to the event (${selectedRequest?.eventDetails.Attendee.length}/${selectedRequest?.eventDetails.Max_Attendees} spots filled).`
+                : 'Are you sure you want to reject this request?'}
             </AlertDialogDescription>
           </AlertDialogHeader>
           
@@ -299,7 +358,7 @@ const Request = () => {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => handleStatusUpdate(selectedRequest!.$id, actionType === 'approve' ? 'approved' : 'rejected')}
+              onClick={() => selectedRequest && handleStatusUpdate(selectedRequest, actionType === 'approve' ? 'approved' : 'rejected')}
             >
               {actionType === 'approve' ? 'Approve' : 'Reject'}
             </AlertDialogAction>
