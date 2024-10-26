@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Navbar } from "@/components/Navbar";
-import { databases } from "../appwrite";
+import { databases, account } from "../appwrite";
 import { Query } from "appwrite";
 import { 
   Card,
@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useNavigate } from "react-router-dom";
 
 interface EventDocument {
   $id: string;
@@ -48,9 +49,17 @@ type RequestDocument = {
     eventDetails: EventDocument;
     registrationDate: string;
     status: 'pending' | 'approved' | 'rejected';
+    userId: string;
 };
 
+interface UserData {
+  email?: string;
+  name?: string;
+  $id: string;  // Made $id required
+}
+
 const Request = () => {
+  const [user, setUser] = useState<UserData | null>(null);
   const [requests, setRequests] = useState<RequestDocument[]>([]);
   const [filterStatus, setFilterStatus] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
@@ -59,7 +68,14 @@ const Request = () => {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
 
+  const navigate = useNavigate();
+
   const fetchRequests = async () => {
+    if (!user?.$id) {
+      console.error('No user ID available');
+      return;
+    }
+
     try {
       setIsLoading(true);
       const response = await databases.listDocuments(
@@ -73,11 +89,11 @@ const Request = () => {
       const requestsWithEvents = await Promise.all(
         response.documents.map(async (request) => {
           try {
-            // Debug log to see the actual structure of request.event
             console.log('Request event data:', {
               requestId: request.$id,
               eventData: request.event,
-              eventType: typeof request.event
+              eventType: typeof request.event,
+              userId: request.userId || user.$id  // Use existing userId or current user's ID
             });
   
             let eventId: string;
@@ -86,19 +102,15 @@ const Request = () => {
               throw new Error('Event ID is missing');
             }
   
-            // If event is already a string, use it directly
             if (typeof request.event === 'string') {
               eventId = request.event;
             }
-            // If event is an object with $id
             else if (typeof request.event === 'object' && '$id' in request.event) {
               eventId = request.event.$id;
             }
-            // If event is an object with id
             else if (typeof request.event === 'object' && 'id' in request.event) {
               eventId = request.event.id;
             }
-            // If event is an array
             else if (Array.isArray(request.event) && request.event.length > 0) {
               const firstEvent = request.event[0];
               if (typeof firstEvent === 'string') {
@@ -109,7 +121,6 @@ const Request = () => {
                 throw new Error('Invalid event array format');
               }
             }
-            // If event is an object, try to get the first key or value that looks like an ID
             else if (typeof request.event === 'object') {
               const eventObj = request.event as Record<string, any>;
               const possibleId = Object.values(eventObj).find(value => 
@@ -124,7 +135,6 @@ const Request = () => {
               throw new Error('Unsupported event data format');
             }
   
-            // Fetch the event details
             const eventResponse = await databases.getDocument(
               import.meta.env.VITE_DATABASE_ID,
               import.meta.env.VITE_EVENT_COLLECTION_ID,
@@ -143,12 +153,12 @@ const Request = () => {
               },
               registrationDate: request.registrationDate,
               status: request.status,
+              userId: request.userId || user.$id  // Use existing userId or current user's ID
             };
   
             return requestDoc;
           } catch (error) {
             console.error(`Error fetching event details for request ${request.$id}:`, error);
-            // Log additional debug information
             console.debug('Failed request data:', {
               request: request,
               eventData: request.event,
@@ -172,11 +182,33 @@ const Request = () => {
   };
 
   useEffect(() => {
-    fetchRequests();
+    const checkSession = async () => {
+      try {
+        const userData = await account.get();
+        if (!userData.$id) {
+          throw new Error('No user ID available');
+        }
+        setUser(userData as UserData);
+      } catch (error) {
+        console.error("Session check failed:", error);
+        navigate('/login');
+      }
+    };
+    checkSession();
   }, []);
+
+  useEffect(() => {
+    if (user?.$id) {
+      fetchRequests();
+    }
+  }, [user]);
 
   const handleStatusUpdate = async (request: RequestDocument, newStatus: string) => {
     try {
+      if (!user?.$id) {
+        throw new Error('No user ID available');
+      }
+
       setIsLoading(true);
       
       // Update request status
@@ -189,7 +221,7 @@ const Request = () => {
         }
       );
 
-      // If approving, update event's Attendee array
+      // If approving, update event's Attendee array with the user's ID
       if (newStatus === 'approved') {
         const currentEvent = request.eventDetails;
         
@@ -198,16 +230,31 @@ const Request = () => {
           throw new Error('Event has reached maximum capacity');
         }
 
-        // Generate unique attendee ID (you might want to use actual user IDs in production)
-        const attendeeId = crypto.randomUUID();
+        // Get the userId from the request, fallback to current user's ID
+        const userId = request.userId || user.$id;
         
-        // Update event with new attendee
+        if (!userId) {
+          throw new Error('No valid user ID available');
+        }
+
+        // Check if user is already in the attendee list
+        if (currentEvent.Attendee.includes(userId)) {
+          throw new Error('User is already registered for this event');
+        }
+        
+        // Log the update operation
+        console.log('Updating event attendees:', {
+          eventId: currentEvent.$id,
+          userId: userId,
+          currentAttendees: currentEvent.Attendee
+        });
+
         await databases.updateDocument(
           import.meta.env.VITE_DATABASE_ID,
           import.meta.env.VITE_EVENT_COLLECTION_ID,
           currentEvent.$id,
           {
-            Attendee: [...currentEvent.Attendee, attendeeId]
+            Attendee: [...currentEvent.Attendee, userId]
           }
         );
       }
@@ -299,6 +346,7 @@ const Request = () => {
                     </Badge>
                     <div className="flex items-center gap-1 text-sm text-gray-600">
                       <Users className="w-4 h-4" />
+                      <span>{request.eventDetails.Attendee.length}/{request.eventDetails.Max_Attendees}</span>
                     </div>
                   </div>
                 </CardHeader>

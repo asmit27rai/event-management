@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Mail } from "lucide-react";
 import { account } from "@/appwrite";
 import { useNavigate } from "react-router-dom";
+import { Navbar } from "@/components/Navbar";
 
 interface UserData {
   email?: string;
@@ -46,7 +47,9 @@ const Profile = () => {
   }
 
   return (
-    <Card className="w-full max-w-lg mx-auto p-8 shadow-xl rounded-xl bg-gradient-to-r from-white to-gray-100">
+    <div>
+    <Navbar />
+    <Card className="w-full max-w-lg mx-auto p-8 shadow-xl rounded-xl bg-gradient-to-r from-white to-gray-100 mt-6">
       <CardHeader className="pb-4 border-b border-gray-200 text-center">
         <Avatar className="h-20 w-20 mx-auto shadow-md">
           <AvatarFallback className="text-xl font-bold bg-gray-200 text-gray-600">
@@ -63,6 +66,7 @@ const Profile = () => {
         </div>
       </CardContent>
     </Card>
+    </div>
   );
 };
 

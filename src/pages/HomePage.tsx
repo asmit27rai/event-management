@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { databases } from "../appwrite";
+import { databases, account } from "../appwrite";
 import { Navbar } from "@/components/Navbar";
 import { EventCard } from "@/components/EventCard";
 import { EventFilters } from "@/components/EventFilters";
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useNavigate } from "react-router-dom";
 
 // Interface matching your Appwrite document structure
 interface EventDocument {
@@ -31,12 +32,20 @@ interface EventDocument {
   Attendee: string[];
 }
 
+interface UserData {
+  email?: string;
+  name?: string;
+  $id?: string;
+}
+
 export function HomePage() {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [activeCategory, setActiveCategory] = useState("All");
   const [events, setEvents] = useState<EventDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [user, setUser] = useState<UserData | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -61,6 +70,19 @@ export function HomePage() {
     fetchEvents();
   }, []);
 
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const userData = await account.get();
+        setUser(userData);
+      } catch (error) {
+        console.error("Session check failed:", error);
+        navigate('/login');
+      }
+    };
+    checkSession();
+  }, []);
+
   // Format date for display
   const formatEventDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -82,7 +104,9 @@ export function HomePage() {
       category: event.type,
       Attendee: event.Attendee,
       Max_Attendees: event.Max_Attendees,
+      description: event.description,
       image: "/api/placeholder/400/200",
+      isRegistered: event.Attendee.includes(user?.$id || ""),
     };
   };
 
