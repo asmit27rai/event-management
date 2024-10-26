@@ -56,7 +56,7 @@ type RequestDocument = {
 interface UserData {
   email?: string;
   name?: string;
-  $id: string;  // Made $id required
+  $id: string;
 }
 
 const Request = () => {
@@ -95,7 +95,7 @@ const Request = () => {
               requestId: request.$id,
               eventData: request.event,
               eventType: typeof request.event,
-              userId: request.userId || user.$id  // Use existing userId or current user's ID
+              userId: request.userId || "",
             });
   
             let eventId: string;

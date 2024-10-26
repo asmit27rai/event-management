@@ -1,5 +1,5 @@
-import { useState, FormEvent } from "react";
-import { databases } from "../appwrite";
+import { useState, FormEvent, useEffect } from "react";
+import { databases, account } from "../appwrite";
 import { ID } from "appwrite";
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface RegistrationModalProps {
   isOpen: boolean;
@@ -22,6 +23,12 @@ interface RegistrationModalProps {
   };
 }
 
+interface UserData {
+  email?: string;
+  name?: string;
+  $id?: string;
+}
+
 export default function RegistrationModal({
   isOpen,
   onClose,
@@ -29,6 +36,9 @@ export default function RegistrationModal({
 }: RegistrationModalProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [user, setUser] = useState<UserData | null>(null);
+
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,6 +54,7 @@ export default function RegistrationModal({
           event: [event.$id], // Wrap the event ID in an array if the schema requires an array
           registrationDate: new Date().toISOString(), // Required datetime field
           status: "pending", // Required enum field
+          userId: user?.$id || "",
         }
       );
       toast({
@@ -57,6 +68,19 @@ export default function RegistrationModal({
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const userData = await account.get();
+        setUser(userData);
+      } catch (error) {
+        console.error("Session check failed:", error);
+        navigate('/login');
+      }
+    };
+    checkSession();
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
