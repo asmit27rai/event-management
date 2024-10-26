@@ -1,7 +1,7 @@
 import { useEffect, useState, ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { account, databases } from "../appwrite";
-import { ID, Permission, Role } from "appwrite";
+import { account, databases, storage } from "../appwrite";
+import { ID, Permission, Role, Query } from "appwrite";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,10 +20,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Calendar, PlusCircle, Bell, User, LogOut, Inbox } from "lucide-react";
+import { Calendar, PlusCircle, User, LogOut, Inbox, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// Updated event types to match database enum values exactly
 const eventTypes = [
   { label: "Technology", value: "Technology" },
   { label: "Business", value: "Business" },
@@ -39,6 +38,7 @@ interface FormData {
   description: string;
   attendeesCount: string;
   type: string;
+  file?: File | null;
 }
 
 interface UserData {
@@ -55,6 +55,7 @@ interface EventData {
   type: string;
   Max_Attendees: number;
   Attendee: string[];
+  bucket_id?: string;
 }
 
 export function Navbar() {
@@ -64,6 +65,8 @@ export function Navbar() {
   const admin = import.meta.env.VITE_ADMIN_EMAIL;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [pendingRequestCount, setPendingRequestCount] = useState<number>(0);
 
   const initialFormData: FormData = {
     title: "",
@@ -72,6 +75,7 @@ export function Navbar() {
     description: "",
     attendeesCount: "",
     type: "",
+    file: null,
   };
 
   const [formData, setFormData] = useState<FormData>(initialFormData);
@@ -89,6 +93,25 @@ export function Navbar() {
 
     checkSession();
   }, [navigate]);
+
+  useEffect(() => {
+    if (user?.email === admin) {
+      fetchPendingRequestCount();
+    }
+  }, [user, admin]);
+
+  const fetchPendingRequestCount = async () => {
+    try {
+      const response = await databases.listDocuments(
+        import.meta.env.VITE_DATABASE_ID,
+        import.meta.env.VITE_REQUESTS_COLLECTION_ID,
+        [Query.equal('status', 'pending')]
+      );
+      setPendingRequestCount(response.total);
+    } catch (error) {
+      console.error('Error fetching pending requests count:', error);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -111,6 +134,15 @@ export function Navbar() {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFormData((prev) => ({
+        ...prev,
+        file: e.target.files![0],
+      }));
+    }
   };
 
   const handleTypeChange = (value: string) => {
@@ -137,12 +169,42 @@ export function Navbar() {
     return true;
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    setIsLoading(true);
+  const uploadFile = async (): Promise<string | undefined> => {
+    if (!formData.file) return undefined;
 
     try {
+      const fileUpload = await storage.createFile(
+        import.meta.env.VITE_EVENT_IMAGE_ID,
+        ID.unique(),
+        formData.file
+      );
+
+      return fileUpload.$id;
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      throw error;
+    }
+  };
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!validateForm()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    let bucketId: string | undefined;
+
+    try {
+      if (formData.file) {
+        bucketId = await uploadFile();
+      }
+
       const eventData: EventData = {
         title: formData.title,
         date: new Date(formData.date).toISOString(),
@@ -151,6 +213,7 @@ export function Navbar() {
         type: formData.type,
         Max_Attendees: parseInt(formData.attendeesCount),
         Attendee: [],
+        ...(bucketId && { bucket_id: bucketId }),
       };
 
       await databases.createDocument(
@@ -165,11 +228,21 @@ export function Navbar() {
         ]
       );
 
+      toast({
+        title: "Success",
+        description: "Event created successfully!",
+      });
+
       setIsModalOpen(false);
       setFormData(initialFormData);
-      console.log("Event created successfully!");
+      setUploadProgress(0);
     } catch (error) {
       console.error("Error creating event:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create event. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -191,23 +264,17 @@ export function Navbar() {
                   Create Event
                 </Button>
               )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative">
-                    <Bell className="h-5 w-5" />
-                    <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
-                      3
+              {admin === user?.email && (
+                <Button onClick={() => navigate("/requests")} className="relative">
+                  <Inbox className="h-4 w-4 mr-2" />
+                  Requests
+                  {pendingRequestCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {pendingRequestCount}
                     </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-64">
-                  <DropdownMenuLabel>Notifications</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>New event registration</DropdownMenuItem>
-                  <DropdownMenuItem>Upcoming event reminder</DropdownMenuItem>
-                  <DropdownMenuItem>Event update: Venue changed</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                  )}
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative">
@@ -223,12 +290,6 @@ export function Navbar() {
                     <User className="h-4 w-4 mr-2" />
                     Profile
                   </DropdownMenuItem>
-                  {admin === user?.email && (
-                    <DropdownMenuItem onClick={() => navigate("/requests")}>
-                      <Inbox className="h-4 w-4 mr-2" />
-                      Requests
-                    </DropdownMenuItem>
-                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="h-4 w-4 mr-2" />
@@ -329,6 +390,28 @@ export function Navbar() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="file">Upload File</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="file"
+                  name="file"
+                  type="file"
+                  onChange={handleFileChange}
+                  className="flex-1"
+                />
+                <Upload className="h-5 w-5 text-gray-400" />
+              </div>
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div
+                    className="bg-blue-600 h-2.5 rounded-full"
+                    style={{ width: `${uploadProgress}%` }}
+                  ></div>
+                </div>
+              )}
             </div>
 
             <Button type="submit" disabled={isLoading}>

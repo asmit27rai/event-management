@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -15,7 +15,9 @@ import {
   Clock,
   ArrowRight,
   Radio,
+  Image as ImageIcon,
 } from "lucide-react";
+import { storage } from "../appwrite"; // Ensure this path matches your appwrite config
 import RegistrationModal from "./RegistrationModal";
 import EventDetailsDialog from "./EventDetailsDialog";
 
@@ -28,7 +30,7 @@ interface EventCardProps {
     venue: string;
     category: string;
     Attendee: string[];
-    image: string;
+    bucket_id?: string;
     Max_Attendees: number;
     description: string;
     isRegistered: boolean;
@@ -39,6 +41,30 @@ interface EventCardProps {
 export function EventCard({ event, type }: EventCardProps) {
   const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState(false);
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    const fetchEventImage = async () => {
+      if (event.bucket_id && !imageError) {
+        try {
+          const result = await storage.getFilePreview(
+            import.meta.env.VITE_EVENT_IMAGE_ID,
+            event.bucket_id,
+            800, // width
+            400  // height
+          );
+          console.log(result);
+          setImageUrl(result);
+        } catch (error) {
+          console.error("Error fetching event image:", error);
+          setImageError(true);
+        }
+      }
+    };
+
+    fetchEventImage();
+  }, [event.bucket_id]);
 
   const getBadgeStyle = () => {
     switch (type) {
@@ -75,6 +101,37 @@ export function EventCard({ event, type }: EventCardProps) {
     }
   };
 
+  const renderImage = () => {
+    if (imageUrl && !imageError) {
+      return (
+        <div className="relative h-48 overflow-hidden">
+          <img
+            src={imageUrl}
+            alt={event.title}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+          <div className="absolute inset-0 bg-black bg-opacity-20" /> {/* Overlay */}
+        </div>
+      );
+    }
+
+    return (
+      <div className={`relative h-48 bg-gradient-to-r ${getGradientStyle()}`}>
+        <div className="absolute inset-0 flex items-center justify-center">
+          {imageError ? (
+            <div className="flex flex-col items-center">
+              <ImageIcon className="w-16 h-16 text-gray-400" />
+              <span className="text-sm text-gray-500 mt-2">Image not available</span>
+            </div>
+          ) : (
+            renderStatusIcon()
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
       <Card
@@ -82,11 +139,7 @@ export function EventCard({ event, type }: EventCardProps) {
           type === "past" ? "opacity-75" : "hover:shadow-lg"
         }`}
       >
-        <div className={`relative h-48 bg-gradient-to-r ${getGradientStyle()}`}>
-          <div className="absolute inset-0 flex items-center justify-center">
-            {renderStatusIcon()}
-          </div>
-        </div>
+        {renderImage()}
 
         <CardHeader>
           <div className="flex justify-between items-start">

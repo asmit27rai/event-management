@@ -5,17 +5,16 @@ import { EventCard } from "@/components/EventCard";
 import { EventFilters } from "@/components/EventFilters";
 import {
   Loader2,
-  LayoutGrid,
-  List,
   Calendar,
   Radio,
   Clock,
+  UserPlus,
+  MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 
-// Interface matching your Appwrite document structure
 interface EventDocument {
   $id: string;
   $createdAt: string;
@@ -30,6 +29,7 @@ interface EventDocument {
   type: string;
   Max_Attendees: number;
   Attendee: string[];
+  bucket_id: string;
 }
 
 interface UserData {
@@ -39,7 +39,6 @@ interface UserData {
 }
 
 export function HomePage() {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [activeCategory, setActiveCategory] = useState("All");
   const [events, setEvents] = useState<EventDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -83,7 +82,6 @@ export function HomePage() {
     checkSession();
   }, []);
 
-  // Format date for display
   const formatEventDate = (dateString: string) => {
     const date = new Date(dateString);
     return {
@@ -92,7 +90,6 @@ export function HomePage() {
     };
   };
 
-  // Map event document to EventCard props
   const mapEventToCardProps = (event: EventDocument) => {
     const { date, time } = formatEventDate(event.date);
     return {
@@ -105,18 +102,16 @@ export function HomePage() {
       Attendee: event.Attendee,
       Max_Attendees: event.Max_Attendees,
       description: event.description,
-      image: "/api/placeholder/400/200",
+      bucket_id: event.bucket_id,
       isRegistered: event.Attendee.includes(user?.$id || ""),
     };
   };
 
-  // Filter events based on category
   const filterEventsByCategory = (events: EventDocument[]) => {
     if (activeCategory === "All") return events;
     return events.filter((event) => event.type === activeCategory);
   };
 
-  // Categorize events based on their date
   const categorizeEvents = () => {
     const now = new Date();
     const filteredEvents = filterEventsByCategory(events);
@@ -179,20 +174,20 @@ export function HomePage() {
             activeCategory={activeCategory}
             setCategory={setActiveCategory}
           />
-          <div className="flex items-center gap-2 self-end sm:self-auto">
+          <div className="flex items-center gap-2">
             <Button
-              variant={viewMode === "grid" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("grid")}
+              onClick={() => navigate('/registerEvent')}
+              className="flex items-center gap-2"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <UserPlus className="w-4 h-4" />
+              Register Event
             </Button>
             <Button
-              variant={viewMode === "list" ? "default" : "outline"}
-              size="sm"
-              onClick={() => setViewMode("list")}
+              onClick={() => navigate('/contact')}
+              className="flex items-center gap-2"
             >
-              <List className="w-4 h-4" />
+              <MessageSquare className="w-4 h-4" />
+              Contact
             </Button>
           </div>
         </div>
@@ -219,37 +214,19 @@ export function HomePage() {
             </TabsList>
 
             <TabsContent value="upcoming">
-              <div
-                className={`grid ${
-                  viewMode === "grid"
-                    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                    : "grid-cols-1 gap-4"
-                }`}
-              >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {renderEvents(upcoming, "upcoming")}
               </div>
             </TabsContent>
 
             <TabsContent value="live">
-              <div
-                className={`grid ${
-                  viewMode === "grid"
-                    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                    : "grid-cols-1 gap-4"
-                }`}
-              >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {renderEvents(live, "live")}
               </div>
             </TabsContent>
 
             <TabsContent value="past">
-              <div
-                className={`grid ${
-                  viewMode === "grid"
-                    ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-                    : "grid-cols-1 gap-4"
-                }`}
-              >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {renderEvents(past, "past")}
               </div>
             </TabsContent>

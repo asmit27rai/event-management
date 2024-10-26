@@ -8,13 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, Calendar, Users, Loader2 } from "lucide-react";
@@ -63,7 +56,6 @@ const Request = () => {
   const { toast } = useToast();
   const [user, setUser] = useState<UserData | null>(null);
   const [requests, setRequests] = useState<RequestDocument[]>([]);
-  const [filterStatus, setFilterStatus] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<RequestDocument | null>(null);
@@ -84,6 +76,7 @@ const Request = () => {
         import.meta.env.VITE_DATABASE_ID,
         import.meta.env.VITE_REQUESTS_COLLECTION_ID,
         [
+          Query.equal('status', 'pending'),  // Only fetch pending requests
           Query.orderDesc('registrationDate'),
         ]
       );
@@ -155,7 +148,7 @@ const Request = () => {
               },
               registrationDate: request.registrationDate,
               status: request.status,
-              userId: request.userId || user.$id  // Use existing userId or current user's ID
+              userId: request.userId || user.$id
             };
   
             return requestDoc;
@@ -213,7 +206,6 @@ const Request = () => {
 
       setIsLoading(true);
       
-      // Update request status
       await databases.updateDocument(
         import.meta.env.VITE_DATABASE_ID,
         import.meta.env.VITE_REQUESTS_COLLECTION_ID,
@@ -223,28 +215,23 @@ const Request = () => {
         }
       );
 
-      // If approving, update event's Attendee array with the user's ID
       if (newStatus === 'approved') {
         const currentEvent = request.eventDetails;
         
-        // Check if event has reached maximum capacity
         if (currentEvent.Attendee.length >= currentEvent.Max_Attendees) {
           throw new Error('Event has reached maximum capacity');
         }
 
-        // Get the userId from the request, fallback to current user's ID
         const userId = request.userId || user.$id;
         
         if (!userId) {
           throw new Error('No valid user ID available');
         }
 
-        // Check if user is already in the attendee list
         if (currentEvent.Attendee.includes(userId)) {
           throw new Error('User is already registered for this event');
         }
         
-        // Log the update operation
         console.log('Updating event attendees:', {
           eventId: currentEvent.$id,
           userId: userId,
@@ -283,19 +270,6 @@ const Request = () => {
     setIsAlertOpen(true);
   };
 
-  const getStatusBadgeColor = (status: string) => {
-    const colors: Record<string, string> = {
-      pending: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
-      approved: 'bg-green-100 text-green-800 hover:bg-green-200',
-      rejected: 'bg-red-100 text-red-800 hover:bg-red-200'
-    };
-    return colors[status] || 'bg-gray-100';
-  };
-
-  const filteredRequests = filterStatus === 'all' 
-    ? requests 
-    : requests.filter(request => request.status === filterStatus);
-
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -315,40 +289,29 @@ const Request = () => {
       <Navbar />
       
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Event Requests</h1>
-          
-          <Select 
-            value={filterStatus} 
-            onValueChange={setFilterStatus}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Requests</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Pending Requests</h1>
         </div>
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
+        ) : requests.length === 0 ? (
+          <div className="text-center text-gray-500 mt-8">
+            No pending requests found
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredRequests.map((request) => (
+            {requests.map((request) => (
               <Card key={request.$id} className="shadow-lg">
                 <CardHeader>
                   <CardTitle className="text-xl">
                     {request.eventDetails.title}
                   </CardTitle>
                   <div className="flex justify-between items-center">
-                    <Badge className={getStatusBadgeColor(request.status)}>
-                      {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
+                    <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200">
+                      Pending
                     </Badge>
                     <div className="flex items-center gap-1 text-sm text-gray-600">
                       <Users className="w-4 h-4" />
@@ -369,23 +332,21 @@ const Request = () => {
                       <span>Registered: {new Date(request.registrationDate).toLocaleDateString()}</span>
                     </div>
 
-                    {request.status === 'pending' && (
-                      <div className="flex gap-2 mt-4">
-                        <Button 
-                          onClick={() => openActionDialog(request, 'approve')}
-                          className="bg-green-600 hover:bg-green-700 flex-1"
-                          disabled={request.eventDetails.Attendee.length >= request.eventDetails.Max_Attendees}
-                        >
-                          Approve
-                        </Button>
-                        <Button 
-                          onClick={() => openActionDialog(request, 'reject')}
-                          className="bg-red-600 hover:bg-red-700 flex-1"
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    )}
+                    <div className="flex gap-2 mt-4">
+                      <Button 
+                        onClick={() => openActionDialog(request, 'approve')}
+                        className="bg-green-600 hover:bg-green-700 flex-1"
+                        disabled={request.eventDetails.Attendee.length >= request.eventDetails.Max_Attendees}
+                      >
+                        Approve
+                      </Button>
+                      <Button 
+                        onClick={() => openActionDialog(request, 'reject')}
+                        className="bg-red-600 hover:bg-red-700 flex-1"
+                      >
+                        Reject
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
