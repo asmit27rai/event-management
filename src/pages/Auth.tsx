@@ -23,6 +23,25 @@ const deleteExistingSession = async () => {
   }
 };
 
+async function sendMessage(subject: string, message: string, email: string) {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_SERVER_URL}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ subject, message, email }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.details || "Failed to send message");
+    }
+  } catch (error) {
+    console.error("Messaging Error:", error);
+  }
+}
+
 export function Login() {
   const { toast } = useToast();
   const [email, setEmail] = useState("");
@@ -50,6 +69,7 @@ export function Login() {
         title: "Login successful",
         description: "You have logged in successfully.",
       });
+      sendMessage("Login Notification", "You have successfully logged in!", email);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to login");
@@ -161,6 +181,7 @@ export function Signup() {
         title: "Account created",
         description: "Your account has been created successfully",
       });
+      sendMessage("Signup Confirmation", "Your account has been successfully created!", formData.email);
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create account");

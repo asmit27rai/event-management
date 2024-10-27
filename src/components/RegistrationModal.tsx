@@ -29,6 +29,25 @@ interface UserData {
   $id?: string;
 }
 
+async function sendMessage(subject: string, message: string, email: string) {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_SERVER_URL}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ subject, message, email }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.details || "Failed to send message");
+    }
+  } catch (error) {
+    console.error("Messaging Error:", error);
+  }
+}
+
 export default function RegistrationModal({
   isOpen,
   onClose,
@@ -61,6 +80,7 @@ export default function RegistrationModal({
         title: "Registration Request Sent",
         description: "Wait For Administator Approval",
       })
+      sendMessage("Registration Notification", "Your registration request has been sent!", user?.email || "");
       onClose();
     } catch (error) {
       console.error("Registration error:", error);

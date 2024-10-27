@@ -52,6 +52,25 @@ interface UserData {
   $id: string;
 }
 
+async function sendMessage(subject: string, message: string, email: string) {
+  try {
+    const response = await fetch(`${import.meta.env.VITE_SERVER_URL}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ subject, message, email }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.details || "Failed to send message");
+    }
+  } catch (error) {
+    console.error("Messaging Error:", error);
+  }
+}
+
 const Request = () => {
   const { toast } = useToast();
   const [user, setUser] = useState<UserData | null>(null);
@@ -254,6 +273,7 @@ const Request = () => {
         title: 'Request Updated',
         description: 'The request status has been successfully updated.',
       })
+      sendMessage('Request Status Update', `Your request for ${request.eventDetails.title} has been ${newStatus}.`, request.userId);
       setSelectedRequest(null);
       
     } catch (error) {
