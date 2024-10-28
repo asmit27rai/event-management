@@ -51,22 +51,37 @@ const Contact = () => {
     }
 
     try {
+      // Make sure to use the correct endpoint path
       const response = await fetch(`${import.meta.env.VITE_SERVER_URL}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // Add CORS headers if needed
+          "Accept": "application/json",
         },
         body: JSON.stringify(formData),
       });
 
+      // First check if the response is ok
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || "Failed to send email");
+        // Try to parse error response
+        let errorMessage = "Failed to send email";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.details || errorData.error || errorMessage;
+        } catch (parseError) {
+          // If parsing fails, use status text
+          errorMessage = `Server error: ${response.statusText || response.status}`;
+        }
+        throw new Error(errorMessage);
       }
 
+      // Parse successful response
+      const data = await response.json();
+      
       toast({
         title: "Success",
-        description: "Email sent successfully!",
+        description: data.message || "Email sent successfully!",
       });
       form.reset();
     } catch (error) {
@@ -81,6 +96,7 @@ const Contact = () => {
       setIsLoading(false);
     }
   };
+
   const socialLinks = [
     {
       icon: <Github className="h-6 w-6" />,
@@ -141,8 +157,7 @@ const Contact = () => {
               Send me a message
             </CardTitle>
             <CardDescription className="text-gray-600">
-              Fill out the form below and I'll get back to you as soon as
-              possible.
+              Fill out the form below and I'll get back to you as soon as possible.
             </CardDescription>
           </CardHeader>
 
