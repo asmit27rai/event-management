@@ -1,50 +1,30 @@
-# React + TypeScript + Vite
+## Project Title
+**Event Management**
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Project Description    
+The Event Management App is a robust platform built to streamline the process of managing events. It allows admins to add, update, and delete events, review and manage user requests for event participation, and respond to user inquiries. For users, the app offers a seamless experience to explore upcoming events, request to join them, and contact the admin for further details. This app is designed with both usability and scalability in mind, leveraging Appwrite for backend services and React for an interactive user interface.
 
-Currently, two official plugins are available:
+## Inspiration behind the Project  
+The inspiration for this project came from the need to simplify event management for both organizers and participants. Whether for school events, community gatherings, or company activities, a centralized system for event management allows admins to handle all aspects in one place. By integrating communication and request handling features, the app not only simplifies organization but also fosters a community-oriented space where users can connect with event organizers directly.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Tech Stack    
+The project is built using:
 
-## Expanding the ESLint configuration
+- **React** for frontend development and creating dynamic UI components
+- **Tailwind CSS** for styling the application and ensuring a modern, responsive design
+- **Appwrite** for backend services like authentication, file storage, database and messaging function.
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+### Usage of Appwrite
+- **Appwrite Authentication**: I used Appwrite Auth to manage user authentication, including sign-ups, log-ins and maintaining user sessions.
+- **Appwrite Databases**: I used Appwrite databases to store user accounts, manage event and manage requests.
+- **Appwrite Storage**: Appwrite storage is used for securely storing event image. 
 
-- Configure the top-level `parserOptions` property like this:
+## Project Repo  
+GitHub Repository: Event Management
+[Explorer](https://github.com/asmit27rai/event-management)
 
-```js
-export default tseslint.config({
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+## Demo Video/Photos/Link
+- Demo Video: [Link to Video](https://drive.google.com/file/d/1agR2T0oOTFoZVObL_xp6unfzRmZotYat/view?usp=drive_link)
 
-- Replace `tseslint.configs.recommended` to `tseslint.configs.recommendedTypeChecked` or `tseslint.configs.strictTypeChecked`
-- Optionally add `...tseslint.configs.stylisticTypeChecked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and update the config:
-
-```js
-// eslint.config.js
-import react from 'eslint-plugin-react'
-
-export default tseslint.config({
-  // Set the react version
-  settings: { react: { version: '18.3' } },
-  plugins: {
-    // Add the react plugin
-    react,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended rules
-    ...react.configs.recommended.rules,
-    ...react.configs['jsx-runtime'].rules,
-  },
-})
-```
+## Anything Else You Want To Share With Us?
+The Event Management App is designed not only as a tool for event organization but also as a community platform. By including features for user communication and request management, it simplifies event participation and encourages interaction between admins and users. The use of Appwrite services makes it a secure and scalable application that can adapt to a variety of event types and user needs.
